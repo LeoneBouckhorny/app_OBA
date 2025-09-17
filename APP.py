@@ -4,80 +4,74 @@ from collections import defaultdict
 import os
 
 # === Funções auxiliares ===
-def formatar_nome(texto):
-    """Coloca a primeira letra de cada palavra em maiúscula, exceto UF."""
+def formatar_texto(texto, maiusculo_estado=False):
     texto = ' '.join(texto.strip().split())
-    # Se for sigla de estado, mantém maiúscula
-    if len(texto) <= 3 and texto.isupper():
-        return texto
+    if maiusculo_estado:
+        return texto.upper()
     return ' '.join(w.capitalize() for w in texto.split())
 
 def processar_docx(uploaded_file):
     doc = Document(uploaded_file)
     dados = []
 
-    # Ler a tabela do DOCX
     for tabela in doc.tables:
         for i, linha in enumerate(tabela.rows):
             if i == 0:
                 continue  # Ignora cabeçalho
             valores = [c.text.strip() for c in linha.cells]
-            if len(valores) == 7:
-                valido, equipe, funcao, escola, cidade, estado, nome = valores
+            if len(valores) >= 8:  # Garantir que todas as colunas existam
+                medalha, valido, equipe, funcao, escola, cidade, estado, nome = valores[:8]
                 dados.append({
+                    "Medalha": medalha,
                     "Valido": valido,
                     "Equipe": equipe,
                     "Funcao": funcao.lower(),
                     "Escola": escola,
                     "Cidade": cidade,
-                    "Estado": estado.upper(),
+                    "Estado": estado,
                     "Nome": nome
                 })
 
-    # Agrupar por equipe
     equipes = defaultdict(list)
     for item in dados:
         equipes[item["Equipe"]].append(item)
 
-    # Criar novo documento
     novo_doc = Document()
     for equipe, membros in sorted(equipes.items(), key=lambda x: x[0]):
         lider = [m for m in membros if "líder" in m["Funcao"] or "lider" in m["Funcao"]]
         acompanhante = [m for m in membros if "acompanhante" in m["Funcao"]]
         alunos = [m for m in membros if "aluno" in m["Funcao"]]
-        alunos_sorted = sorted(alunos, key=lambda m: formatar_nome(m["Nome"]))
+        alunos_sorted = sorted(alunos, key=lambda m: formatar_texto(m["Nome"]))
 
         ordem_final = lider + acompanhante + alunos_sorted
 
-        # Adiciona nomes ao documento
         for membro in ordem_final:
-            novo_doc.add_paragraph(formatar_nome(membro["Nome"]))
+            novo_doc.add_paragraph(formatar_texto(membro["Nome"]))
 
-        # Informação adicional por equipe
         if membros:
-            # Pegamos o valor de VALIDO do primeiro membro (assumindo que seja igual para todos)
             novo_doc.add_paragraph(f"Equipe: {equipe.split()[-1]}")
             novo_doc.add_paragraph(f"Lançamentos Válidos: {membros[0]['Valido']} m")
-            novo_doc.add_paragraph(formatar_nome(membros[0]["Escola"]))
-            novo_doc.add_paragraph(f"{formatar_nome(membros[0]['Cidade'])} / {membros[0]['Estado']}")
-        
-        novo_doc.add_paragraph("")  # Linha em branco entre equipes
+            novo_doc.add_paragraph(formatar_texto(membros[0]["Escola"]))
+            novo_doc.add_paragraph(f"{formatar_texto(membros[0]['Cidade'])} / {formatar_texto(membros[0]['Estado'], maiusculo_estado=True)}")
+        novo_doc.add_paragraph("")  # Separação entre equipes
 
     return novo_doc
 
 # === Interface Streamlit ===
-st.title("📋 Organizador de Equipes com Lançamentos Válidos")
-st.write("Faça upload do arquivo `.docx` e baixe o arquivo formatado por equipe.")
+st.title("🏅 Organizador de Equipes e Resultados")
+st.write("Faça upload do arquivo `.docx` e baixe o arquivo formatado com lançamentos válidos.")
 
 uploaded_file = st.file_uploader("Envie o arquivo DOCX", type=["docx"])
 
 if uploaded_file:
+    # Nome base do arquivo original (sem extensão)
     nome_base = os.path.splitext(uploaded_file.name)[0]
     novo_nome = f"{nome_base}_FORMATADO.docx"
 
+    # Processar o arquivo
     novo_doc = processar_docx(uploaded_file)
 
-    # Pré-visualização
+    # Prévia (usar st.code para evitar erros de renderização)
     st.subheader("Prévia das primeiras equipes:")
     preview = [p.text for p in novo_doc.paragraphs[:20]]
     st.code("\n".join(preview), language="text")
