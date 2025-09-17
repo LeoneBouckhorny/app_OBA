@@ -36,8 +36,17 @@ def processar_docx(uploaded_file):
     for item in dados:
         equipes[item["Equipe"]].append(item)
 
+    # Ordenar equipes pelo lançamento válido do primeiro membro (em ordem crescente)
+    def valor_valido(membros):
+        try:
+            return float(membros[0]['Valido'].replace(',', '.'))
+        except:
+            return float('inf')  # Valores vazios vão para o final
+
+    equipes_ordenadas = sorted(equipes.items(), key=lambda x: valor_valido(x[1]))
+
     novo_doc = Document()
-    for equipe, membros in sorted(equipes.items(), key=lambda x: x[0]):
+    for equipe, membros in equipes_ordenadas:
         lider = [m for m in membros if "líder" in m["Funcao"] or "lider" in m["Funcao"]]
         acompanhante = [m for m in membros if "acompanhante" in m["Funcao"]]
         alunos = [m for m in membros if "aluno" in m["Funcao"]]
@@ -59,7 +68,7 @@ def processar_docx(uploaded_file):
 
 # === Interface Streamlit ===
 st.title("🏅 Organizador de Equipes e Resultados")
-st.write("Faça upload do arquivo `.docx` e baixe o arquivo formatado com lançamentos válidos.")
+st.write("Faça upload do arquivo `.docx` e baixe o arquivo formatado com lançamentos válidos, ordenado por valor crescente.")
 
 uploaded_file = st.file_uploader("Envie o arquivo DOCX", type=["docx"])
 
