@@ -4,8 +4,15 @@ from collections import defaultdict
 import os
 
 # === Funções auxiliares ===
-def formatar_nome(nome):
-    nome = ' '.join(nome.strip().split())
+def formatar_nome(nome, uf=False):
+    """
+    Formata um nome ou texto:
+    - Somente a primeira letra de cada palavra em maiúscula
+    - Se uf=True, mantém tudo maiúsculo (para siglas de estado)
+    """
+    nome = ' '.join(nome.strip().split())  # remove espaços extras
+    if uf:
+        return nome.upper()  # mantém UF em maiúsculas
     return ' '.join(w.capitalize() for w in nome.split())
 
 def processar_docx(uploaded_file):
@@ -34,6 +41,7 @@ def processar_docx(uploaded_file):
 
     novo_doc = Document()
     for equipe, membros in sorted(equipes.items(), key=lambda x: x[0]):
+        # Ordenar membros: líder -> acompanhante -> alunos em ordem alfabética
         lider = [m for m in membros if "líder" in m["Funcao"] or "lider" in m["Funcao"]]
         acompanhante = [m for m in membros if "acompanhante" in m["Funcao"]]
         alunos = [m for m in membros if "aluno" in m["Funcao"]]
@@ -42,11 +50,13 @@ def processar_docx(uploaded_file):
         ordem_final = lider + acompanhante + alunos_sorted
         for membro in ordem_final:
             novo_doc.add_paragraph(formatar_nome(membro["Nome"]))
+
         if membros:
             novo_doc.add_paragraph(f"Equipe: {equipe.split()[-1]}")
-            novo_doc.add_paragraph(membros[0]["Escola"])
-            novo_doc.add_paragraph(f"{membros[0]['Cidade']} / {membros[0]['Estado']}")
-        novo_doc.add_paragraph("")
+            novo_doc.add_paragraph(formatar_nome(membros[0]["Escola"]))
+            novo_doc.add_paragraph(f"{formatar_nome(membros[0]['Cidade'])} / {formatar_nome(membros[0]['Estado'], uf=True)}")
+
+        novo_doc.add_paragraph("")  # linha em branco entre equipes
     return novo_doc
 
 # === Interface Streamlit ===
@@ -56,17 +66,15 @@ st.write("Faça upload do arquivo `.docx` e baixe o arquivo formatado.")
 uploaded_file = st.file_uploader("Envie o arquivo DOCX", type=["docx"])
 
 if uploaded_file:
-    # Nome base do arquivo original (sem extensão)
     nome_base = os.path.splitext(uploaded_file.name)[0]
     novo_nome = f"{nome_base}_FORMATADO.docx"
 
-    # Processar o arquivo
     novo_doc = processar_docx(uploaded_file)
 
-    # Prévia
+    # Prévia usando st.code para evitar erros de renderização
     st.subheader("Prévia das primeiras equipes:")
     preview = [p.text for p in novo_doc.paragraphs[:20]]
-    st.text("\n".join(preview))
+    st.code("\n".join(preview), language="text")
 
     # Salvar e disponibilizar para download
     novo_doc.save(novo_nome)
