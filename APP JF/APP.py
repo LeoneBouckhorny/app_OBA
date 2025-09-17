@@ -56,17 +56,15 @@ st.write("Faça upload do arquivo `.docx` e baixe o arquivo formatado.")
 uploaded_file = st.file_uploader("Envie o arquivo DOCX", type=["docx"])
 
 if uploaded_file:
-    # Nome base do arquivo original (sem extensão)
     nome_base = os.path.splitext(uploaded_file.name)[0]
     novo_nome = f"{nome_base}_FORMATADO.docx"
 
-    # Processar o arquivo
     novo_doc = processar_docx(uploaded_file)
 
-    # Prévia
+    # Prévia usando st.code para evitar erros de renderização
     st.subheader("Prévia das primeiras equipes:")
     preview = [p.text for p in novo_doc.paragraphs[:20]]
-    st.text("\n".join(preview))
+    st.code("\n".join(preview), language="text")
 
     # Salvar e disponibilizar para download
     novo_doc.save(novo_nome)
